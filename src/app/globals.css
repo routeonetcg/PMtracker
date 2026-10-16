@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Route One TCG brand: deep navy, gold, black and white. */
+:root {
+  --background: #f5f7fb;
+  --foreground: #0b1b3a;
+  --card: #ffffff;
+  --card-foreground: #0b1b3a;
+  --popover: #ffffff;
+  --popover-foreground: #0b1b3a;
+  --primary: #f5b700;
+  --primary-foreground: #0b1b3a;
+  --secondary: #e8edf6;
+  --secondary-foreground: #0b1b3a;
+  --muted: #eef1f7;
+  --muted-foreground: #56627a;
+  --accent: #e3e9f5;
+  --accent-foreground: #0b1b3a;
+  --navy: #0b1b3a;
+  --gold: #c99400;
+  --profit: #15803d;
+  --loss: #dc2626;
+  --warning: #b45309;
+  --destructive: #dc2626;
+  --border: #dde3ee;
+  --input: #d3dae8;
+  --ring: #f5b700;
+  --chart-1: #b8860b;
+  --chart-2: #2f5fd0;
+  --chart-3: #15803d;
+  --chart-4: #9333ea;
+  --chart-5: #0e7490;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: #05080f;
+  --foreground: #f4f6fb;
+  --card: #0b1529;
+  --card-foreground: #f4f6fb;
+  --popover: #0d1830;
+  --popover-foreground: #f4f6fb;
+  --primary: #f5b700;
+  --primary-foreground: #0b1b3a;
+  --secondary: #13213f;
+  --secondary-foreground: #f4f6fb;
+  --muted: #101c36;
+  --muted-foreground: #93a0bb;
+  --accent: #172a52;
+  --accent-foreground: #f4f6fb;
+  --navy: #0b1b3a;
+  --gold: #f5b700;
+  --profit: #34d399;
+  --loss: #f87171;
+  --warning: #fbbf24;
+  --destructive: #ef4444;
+  --border: #1c2a48;
+  --input: #22325a;
+  --ring: #f5b700;
+  --chart-1: #bc8a00;
+  --chart-2: #4a7fe8;
+  --chart-3: #34d399;
+  --chart-4: #c084fc;
+  --chart-5: #22d3ee;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-navy: var(--navy);
+  --color-gold: var(--gold);
+  --color-profit: var(--profit);
+  --color-loss: var(--loss);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* iOS zooms into inputs under 16px: keep form text at 16px on phones. */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
