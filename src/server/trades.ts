@@ -2,7 +2,8 @@ import "server-only";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { z } from "zod";
 import type { Tx } from "@/db";
-import { acquisitions, cards, inventoryItems, partners, tradeLines, trades } from "@/db/schema";
+import { acquisitions, cards, inventoryItems, itemPriceHistory, partners, tradeLines, trades } from "@/db/schema";
+import { todayISO } from "@/lib/dates";
 import { computeTrade } from "@/lib/money";
 import type { tradeSchema } from "@/lib/validation";
 import { findOrCreateCard, takeCopies, UserError } from "./inventory";
@@ -93,6 +94,9 @@ export async function createTrade(tx: Tx, data: TradeData) {
           marketUpdatedAt: l.unitMarket !== null ? now : null,
         })
         .returning({ id: inventoryItems.id });
+      if (l.unitMarket !== null) {
+        await tx.insert(itemPriceHistory).values({ itemId: item.id, onDate: todayISO(), priceCents: l.unitMarket, source: "Entered at trade" });
+      }
       await tx.insert(tradeLines).values({
         tradeId: trade.id,
         direction: "in",

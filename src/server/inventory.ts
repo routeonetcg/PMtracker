@@ -47,6 +47,8 @@ export const itemSelect = {
   marketCents: inventoryItems.marketCents,
   marketSource: inventoryItems.marketSource,
   marketUpdatedAt: inventoryItems.marketUpdatedAt,
+  marketMode: inventoryItems.marketMode,
+  marketProductId: inventoryItems.marketProductId,
   updatedAt: inventoryItems.updatedAt,
   photoId: primaryPhoto,
   card: {

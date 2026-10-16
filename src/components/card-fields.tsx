@@ -1,6 +1,14 @@
 "use client";
 
+import { Loader2, Search } from "lucide-react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { searchProviderAction } from "@/app/(app)/prices/actions";
+import { CardThumb } from "@/components/display";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, MoneyInput, Select } from "@/components/ui/form-controls";
+import type { ProviderProduct } from "@/lib/prices/types";
 import { GRADERS, keys, LANGUAGES, RARITY_SUGGESTIONS, RAW_CONDITIONS, VARIANTS, type Variant } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +96,7 @@ export function CardFields({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Card name" htmlFor={`${idPrefix}-name`} error={err(`${prefix}.name`)} className="sm:col-span-2">
+        <div className="flex gap-2">
         <Input
           id={`${idPrefix}-name`}
           list={`${idPrefix}-names`}
@@ -97,6 +106,22 @@ export function CardFields({
           autoComplete="off"
           aria-invalid={!!err(`${prefix}.name`)}
         />
+        <CardLookup
+          query={value.name}
+          language={value.language}
+          onPick={(p) =>
+            onChange({
+              ...value,
+              name: p.name,
+              setName: p.setName ?? value.setName,
+              number: p.number ?? value.number,
+              language: p.language,
+              rarity: p.rarity ?? value.rarity,
+              imageUrl: p.imageUrl ?? value.imageUrl,
+            })
+          }
+        />
+        </div>
         <datalist id={`${idPrefix}-names`}>
           {known.slice(0, 300).map((k) => (
             <option key={suggestionLabel(k)} value={suggestionLabel(k)} />
@@ -164,6 +189,86 @@ export function CardFields({
         </div>
       </fieldset>
     </div>
+  );
+}
+
+/** Look the card up in the TCGdex catalog and fill in set, number, rarity and image. */
+function CardLookup({ query, language, onPick }: { query: string; language: "EN" | "JP"; onPick: (p: ProviderProduct) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState(query);
+  const [lang, setLang] = useState(language);
+  const [results, setResults] = useState<ProviderProduct[] | null>(null);
+  const [pending, start] = useTransition();
+  const search = (query = q, language = lang) =>
+    start(async () => {
+      const res = await searchProviderAction({ provider: "tcgdex", query, language });
+      if (!res.ok) {
+        setResults([]);
+        return void toast.error(res.error);
+      }
+      setResults(res.data);
+    });
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="shrink-0"
+        aria-label="Look up card"
+        onClick={() => {
+          setQ(query);
+          setLang(language);
+          setResults(null);
+          setOpen(true);
+          // Search right away with what's already typed.
+          if (query.trim().length >= 2) search(query, language);
+        }}
+      >
+        <Search /> <span className="hidden sm:inline">Look up</span>
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title="Look up a card" description="From the free TCGdex catalog. Fills in set, number, rarity and picture." className="sm:max-w-xl">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              search();
+            }}
+          >
+            <Select aria-label="Language" className="w-20" value={lang} onChange={(e) => setLang(e.target.value as "EN" | "JP")}>
+              <option value="EN">EN</option>
+              <option value="JP">JP</option>
+            </Select>
+            <Input aria-label="Card name" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Charizard ex" />
+            <Button type="submit" disabled={pending}>
+              {pending ? <Loader2 className="animate-spin" /> : <Search />}
+            </Button>
+          </form>
+          <ul className="-mx-2 max-h-[55dvh] divide-y overflow-y-auto">
+            {results?.length === 0 ? <li className="px-2 py-6 text-center text-sm text-muted-foreground">No matches — you can still type the details yourself.</li> : null}
+            {results?.map((r) => (
+              <li key={r.externalId}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-accent"
+                  onClick={() => {
+                    onPick(r);
+                    setOpen(false);
+                  }}
+                >
+                  <CardThumb name={r.name} imageUrl={r.imageUrl} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{r.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{[r.setName, r.number, r.rarity].filter(Boolean).join(" · ")}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

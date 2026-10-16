@@ -7,6 +7,7 @@ import { ACTIVE_STATUSES } from "@/lib/labels";
 import { computeMetrics, type Realization } from "@/lib/metrics";
 import { costBasis } from "@/lib/money";
 import { getSettings } from "./inventory";
+import { monthlyValueSnapshots, openAlerts } from "./prices/queries";
 
 export async function loadDashboard(tx: Tx, period: Period) {
   const s = await getSettings(tx);
@@ -94,6 +95,7 @@ export async function loadDashboard(tx: Tx, period: Period) {
       shippingCents: inventoryItems.shippingCents,
       gradingCents: inventoryItems.gradingCents,
       marketCents: inventoryItems.marketCents,
+      marketUpdatedAt: inventoryItems.marketUpdatedAt,
       acquiredOn: inventoryItems.acquiredOn,
       cardName: cards.name,
       imageUrl: cards.imageUrl,
@@ -116,6 +118,7 @@ export async function loadDashboard(tx: Tx, period: Period) {
       cardName: i.cardName,
       quantity: i.quantity,
       costBasisCents: costBasis(i),
+      costMissing: i.purchaseCents === null,
       marketCents: i.marketCents,
       acquiredOn: i.acquiredOn,
     })),
@@ -133,8 +136,17 @@ export async function loadDashboard(tx: Tx, period: Period) {
 
   const byId = new Map(items.map((i) => [i.id, i]));
   const costMissingInStock = active.filter((i) => i.purchaseCents === null).length;
+  const staleCutoff = Date.now() - s.staleDays * 86_400_000;
+  const staleCount = active.filter((i) => i.marketCents !== null && (!i.marketUpdatedAt || i.marketUpdatedAt.getTime() < staleCutoff)).length;
+  const snapshots = await monthlyValueSnapshots(tx);
+  const inventoryOverTime = metrics.inventoryOverTime.map((p) => {
+    const snap = snapshots.get(p.month);
+    return { ...p, marketCents: snap ? snap.marketCents : null };
+  });
   return {
-    metrics,
+    metrics: { ...metrics, inventoryOverTime },
+    alerts: await openAlerts(tx, 6),
+    staleCount,
     settings: s,
     costMissingInStock,
     slowMovers: metrics.slowMovers.map((m) => ({ ...m, itemNo: byId.get(m.id)?.itemNo, imageUrl: byId.get(m.id)?.imageUrl ?? null })),

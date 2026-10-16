@@ -6,13 +6,16 @@ import { notFound } from "next/navigation";
 import { CardThumb, cardSubtitle, Money, Pct, StatusBadge } from "@/components/display";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/misc";
-import { acquisitions, activityLog, saleLines, sales, tradeLines, trades } from "@/db/schema";
+import { acquisitions, activityLog, itemPriceHistory, marketProducts, priceAlerts, saleLines, sales, settings, tradeLines, trades } from "@/db/schema";
 import { db } from "@/lib/auth";
-import { formatDate, formatDateTime } from "@/lib/dates";
+import { addDays, formatDate, formatDateTime, todayISO } from "@/lib/dates";
 import { CHANNELS, conditionLabel, LOCATIONS, VARIANTS } from "@/lib/labels";
 import { formatBps, mulDivRound, ratioBps } from "@/lib/money";
 import { getItem, getItemPhotos } from "@/server/inventory";
-import { DeleteItemButton, MarketPriceForm, PhotoManager } from "./item-client";
+import { DeleteItemButton, PhotoManager } from "./item-client";
+import { PricePanel } from "./price-panel";
+import { providerStatus, usingFixtures } from "@/server/prices/providers";
+import { asc, gte } from "drizzle-orm";
 
 export const metadata: Metadata = { title: "Card" };
 
@@ -22,7 +25,7 @@ export default async function ItemPage({ params }: PageProps<"/inventory/[id]">)
   const data = await db(async (tx) => {
     const item = await getItem(tx, id);
     if (!item) return null;
-    const [photos, acq, sale, trade, history] = await Promise.all([
+    const [photos, acq, sale, trade, history, linked, priceHist, rules, s] = await Promise.all([
       getItemPhotos(tx, id),
       item.acquisitionId ? tx.select().from(acquisitions).where(eq(acquisitions.id, item.acquisitionId)) : Promise.resolve([]),
       tx
@@ -41,11 +44,30 @@ export default async function ItemPage({ params }: PageProps<"/inventory/[id]">)
         .where(and(eq(activityLog.tableName, "inventory_items"), eq(activityLog.rowId, id)))
         .orderBy(desc(activityLog.at))
         .limit(15),
+      item.marketProductId ? tx.select().from(marketProducts).where(eq(marketProducts.id, item.marketProductId)) : Promise.resolve([]),
+      tx
+        .select({ onDate: itemPriceHistory.onDate, priceCents: itemPriceHistory.priceCents })
+        .from(itemPriceHistory)
+        .where(and(eq(itemPriceHistory.itemId, id), gte(itemPriceHistory.onDate, addDays(todayISO(), -365))))
+        .orderBy(asc(itemPriceHistory.onDate)),
+      tx.select().from(priceAlerts).where(eq(priceAlerts.itemId, id)).orderBy(asc(priceAlerts.createdAt)),
+      tx.select().from(settings).where(eq(settings.id, 1)),
     ]);
-    return { item, photos, acq: acq[0] ?? null, sale: sale[0] ?? null, trade: trade[0] ?? null, history };
+    return {
+      item,
+      photos,
+      acq: acq[0] ?? null,
+      sale: sale[0] ?? null,
+      trade: trade[0] ?? null,
+      history,
+      linked: linked[0] ?? null,
+      priceHist,
+      rules,
+      settings: s[0],
+    };
   });
   if (!data) notFound();
-  const { item: r, photos, acq, sale, trade, history } = data;
+  const { item: r, photos, acq, sale, trade, history, linked, priceHist, rules, settings: st } = data;
   const active = ["in_stock", "listed", "on_hold", "in_grading"].includes(r.status);
   const unitCost = mulDivRound(r.costBasisCents, 1, r.quantity);
 
@@ -117,14 +139,47 @@ export default async function ItemPage({ params }: PageProps<"/inventory/[id]">)
             {active ? <DeleteItemButton id={r.id} /> : null}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Update market price</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <MarketPriceForm id={r.id} current={r.marketCents} />
-            </CardContent>
-          </Card>
+          {active ? (
+            <PricePanel
+              item={{
+                id: r.id,
+                name: r.card.name,
+                setName: r.card.setName,
+                number: r.card.number,
+                language: r.card.language,
+                conditionType: r.conditionType,
+                grader: r.grader,
+                grade: r.grade,
+                variants: r.card.variants,
+                marketCents: r.marketCents,
+                marketSource: r.marketSource,
+                marketUpdatedAt: r.marketUpdatedAt?.toISOString() ?? null,
+                marketMode: r.marketMode,
+                stale: r.stale,
+                costPerCopyCents: r.costMissing ? null : unitCost,
+                askingCents: r.effectiveAskingCents,
+              }}
+              linked={
+                linked
+                  ? {
+                      provider: linked.provider,
+                      productName: linked.productName,
+                      setName: linked.setName,
+                      label: linked.label,
+                      url: linked.url,
+                      lastPriceCents: linked.lastPriceCents,
+                      lastFetchedAt: linked.lastFetchedAt?.toISOString() ?? null,
+                      lastError: linked.lastError,
+                    }
+                  : null
+              }
+              history={priceHist}
+              rules={rules.map((x) => ({ id: x.id, kind: x.kind, thresholdBps: x.thresholdBps, windowDays: x.windowDays, targetCents: x.targetCents }))}
+              providers={providerStatus()}
+              sample={usingFixtures()}
+              defaultAlert={{ bps: st.defaultAlertBps, days: st.alertWindowDays }}
+            />
+          ) : null}
 
           <Card>
             <CardHeader>

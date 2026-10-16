@@ -88,6 +88,24 @@ describe("dashboard metrics", () => {
     expect(m.slowMovers.map((s) => s.id)).toEqual(["a"]);
   });
 
+  it("leaves cards with no cost out of unrealized P/L instead of treating them as free", () => {
+    const m = computeMetrics({
+      period,
+      realizations: [],
+      expenses: [],
+      stock: [
+        { id: "a", cardName: "A", quantity: 1, costBasisCents: 0, costMissing: true, marketCents: 80000, acquiredOn: "2026-10-01" },
+        { id: "b", cardName: "B", quantity: 1, costBasisCents: 2000, marketCents: 3000, acquiredOn: "2026-10-01" },
+      ],
+      history: [],
+      slowMoverDays: 60,
+      today: "2026-10-16",
+    });
+    expect(m.inventoryMarketCents).toBe(83000);
+    expect(m.unrealizedCents).toBe(1000);
+    expect(m.unrealizedExcludedRows).toBe(1);
+  });
+
   it("flags sales whose cost was never entered", () => {
     const m = computeMetrics({
       period,

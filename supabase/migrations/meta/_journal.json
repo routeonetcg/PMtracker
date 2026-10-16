@@ -8,6 +8,13 @@
       "when": 1792114777950,
       "tag": "20261016013937_phase1_core",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792153202713,
+      "tag": "20261016122002_phase2_prices",
+      "breakpoints": true
     }
   ]
 }

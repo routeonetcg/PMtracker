@@ -26,6 +26,8 @@ export type StockLite = {
   cardName: string;
   quantity: number;
   costBasisCents: number;
+  /** Purchase price never entered: excluded from unrealized P/L. */
+  costMissing?: boolean;
   marketCents: number | null;
   acquiredOn: ISODate;
 };
@@ -43,9 +45,11 @@ export type Metrics = {
   marginBps: number | null;
   inventoryCostCents: number;
   inventoryMarketCents: number;
-  /** Cost of the rows that do have a market price (so P/L compares like with like). */
+  /** Cost of the rows that have both a market price and a known cost (so P/L compares like with like). */
   pricedCostCents: number;
   unpricedRows: number;
+  /** Rows left out of unrealized P/L because their cost is missing. */
+  unrealizedExcludedRows: number;
   unrealizedCents: number;
   unitsInStock: number;
   unitsSold: number;
@@ -95,14 +99,21 @@ export function computeMetrics(input: {
   let invCost = 0;
   let invMarket = 0;
   let pricedCost = 0;
+  let pricedMarket = 0;
   let unpriced = 0;
+  let excluded = 0;
   let units = 0;
   for (const s of input.stock) {
     invCost += s.costBasisCents;
     units += s.quantity;
-    if (s.marketCents === null) unpriced += 1;
+    if (s.marketCents === null) {
+      unpriced += 1;
+      continue;
+    }
+    invMarket += s.marketCents * s.quantity;
+    if (s.costMissing) excluded += 1;
     else {
-      invMarket += s.marketCents * s.quantity;
+      pricedMarket += s.marketCents * s.quantity;
       pricedCost += s.costBasisCents;
     }
   }
@@ -165,7 +176,8 @@ export function computeMetrics(input: {
     inventoryMarketCents: invMarket,
     pricedCostCents: pricedCost,
     unpricedRows: unpriced,
-    unrealizedCents: invMarket - pricedCost,
+    unrealizedExcludedRows: excluded,
+    unrealizedCents: pricedMarket - pricedCost,
     unitsInStock: units,
     unitsSold,
     sellThroughBps: ratioBps(unitsSold, unitsSold + units),

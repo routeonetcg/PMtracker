@@ -19,6 +19,8 @@ export async function saveSettings(input: unknown) {
           slowMoverDays: d.slowMoverDays,
           ebayFeeBps: d.ebayFeePct!,
           ebayFeeFixedCents: d.ebayFeeFixed,
+          defaultAlertBps: d.defaultAlertPct!,
+          alertWindowDays: d.alertWindowDays,
         })
         .where(eq(settings.id, 1)),
     );

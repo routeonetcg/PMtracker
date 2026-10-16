@@ -6,10 +6,8 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Input, MoneyInput } from "@/components/ui/form-controls";
-import { centsToInput } from "@/lib/money";
 import { createClient } from "@/lib/supabase/client";
-import { addPhoto, deleteItem, makePrimaryPhoto, removePhoto, setMarketPrice } from "../actions";
+import { addPhoto, deleteItem, makePrimaryPhoto, removePhoto } from "../actions";
 
 /** Shrink phone photos (often 4–8 MB) to ~1600px JPEG before upload. */
 async function resizeImage(file: File, max = 1600): Promise<Blob> {
@@ -82,33 +80,6 @@ export function PhotoManager({ itemId, photos }: { itemId: string; photos: { id:
         {busy ? "Uploading…" : "Add photos"}
       </Button>
     </div>
-  );
-}
-
-export function MarketPriceForm({ id, current }: { id: string; current: number | null }) {
-  const router = useRouter();
-  const [value, setValue] = useState(centsToInput(current));
-  const [source, setSource] = useState("");
-  const [pending, start] = useTransition();
-  return (
-    <form
-      className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]"
-      onSubmit={(e) => {
-        e.preventDefault();
-        start(async () => {
-          const res = await setMarketPrice({ id, market: value, source });
-          if (!res.ok) return void toast.error(res.error);
-          toast.success("Market price saved");
-          router.refresh();
-        });
-      }}
-    >
-      <MoneyInput aria-label="Market price (each)" value={value} onChange={(e) => setValue(e.target.value)} />
-      <Input aria-label="Source" placeholder="Source (e.g. eBay sold comps)" value={source} onChange={(e) => setSource(e.target.value)} />
-      <Button type="submit" variant="secondary" disabled={pending}>
-        Save
-      </Button>
-    </form>
   );
 }
 

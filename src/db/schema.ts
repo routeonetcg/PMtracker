@@ -12,6 +12,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 // Supabase's auth.users (managed by Supabase, referenced only, never migrated by us).
@@ -69,6 +70,9 @@ export const expenseCategoryEnum = pgEnum("expense_category", [
 export const holderKindEnum = pgEnum("holder_kind", ["partner", "business"]);
 export const tradeDirectionEnum = pgEnum("trade_direction", ["in", "out"]);
 export const eventStatusEnum = pgEnum("event_status", ["planned", "live", "closed"]);
+export const priceProviderEnum = pgEnum("price_provider", ["tcgdex", "pricecharting"]);
+export const marketModeEnum = pgEnum("market_mode", ["auto", "manual"]);
+export const alertKindEnum = pgEnum("alert_kind", ["move_pct", "above", "below"]);
 
 // ---------------------------------------------------------------- people
 export const partners = pgTable("partners", {
@@ -103,6 +107,13 @@ export const settings = pgTable("settings", {
   defaultAlertBps: integer("default_alert_bps").notNull().default(1500),
   ebayFeeBps: integer("ebay_fee_bps").notNull().default(1325),
   ebayFeeFixedCents: cents("ebay_fee_fixed_cents").notNull().default(40),
+  /** Default alert: flag any card whose market moves ± this much over `alertWindowDays`. 0 = off. */
+  alertWindowDays: integer("alert_window_days").notNull().default(7),
+  /** EUR→USD rate in parts per million (1.08 = 1080000), refreshed by the price job. */
+  eurUsdPpm: integer("eur_usd_ppm").notNull().default(1080000),
+  eurUsdUpdatedAt: timestamp("eur_usd_updated_at", { withTimezone: true }),
+  priceJobLastRunAt: timestamp("price_job_last_run_at", { withTimezone: true }),
+  priceJobLastResult: jsonb("price_job_last_result"),
   updatedAt: updatedAt(),
 });
 
@@ -120,6 +131,48 @@ export const events = pgTable("events", {
   createdAt: createdAt(),
   createdBy: createdBy(),
 });
+
+// ---------------------------------------------------------------- market prices
+/** One priced thing at a provider: a card + which price (e.g. TCGplayer holofoil market, PriceCharting PSA 10). */
+export const marketProducts = pgTable(
+  "market_products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: priceProviderEnum("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    priceField: text("price_field").notNull(),
+    label: text("label").notNull(),
+    productName: text("product_name"),
+    setName: text("set_name"),
+    imageUrl: text("image_url"),
+    url: text("url"),
+    currency: text("currency").notNull().default("USD"),
+    lastPriceCents: cents("last_price_cents"),
+    lastNativeCents: cents("last_native_cents"),
+    lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    createdBy: createdBy(),
+  },
+  (t) => [unique("market_products_unique").on(t.provider, t.externalId, t.priceField)],
+);
+
+/** Daily price per market product (USD cents, plus the provider's native amount). */
+export const priceSnapshots = pgTable(
+  "price_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => marketProducts.id, { onDelete: "cascade" }),
+    onDate: date("on_date").notNull(),
+    priceCents: cents("price_cents").notNull(),
+    nativeCents: cents("native_cents").notNull(),
+    currency: text("currency").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("price_snapshots_daily").on(t.productId, t.onDate)],
+);
 
 // ---------------------------------------------------------------- catalog
 export const cards = pgTable(
@@ -201,6 +254,9 @@ export const inventoryItems = pgTable(
     marketCents: cents("market_cents"),
     marketSource: text("market_source"),
     marketUpdatedAt: timestamp("market_updated_at", { withTimezone: true }),
+    /** auto = follow the linked price feed; manual = a hand-entered override wins. */
+    marketMode: marketModeEnum("market_mode").notNull().default("manual"),
+    marketProductId: uuid("market_product_id").references(() => marketProducts.id, { onDelete: "set null" }),
 
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -301,6 +357,73 @@ export const expenses = pgTable("expenses", {
   paidByHolderId: uuid("paid_by_holder_id").references(() => holders.id),
   createdAt: createdAt(),
   createdBy: createdBy(),
+});
+
+// ---------------------------------------------------------------- price history & alerts
+/** The effective market price of each inventory row per day (feed or manual). Drives charts and alerts. */
+export const itemPriceHistory = pgTable(
+  "item_price_history",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    onDate: date("on_date").notNull(),
+    priceCents: cents("price_cents").notNull(),
+    source: text("source").notNull(),
+  },
+  (t) => [unique("item_price_history_daily").on(t.itemId, t.onDate)],
+);
+
+export const priceAlerts = pgTable("price_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => inventoryItems.id, { onDelete: "cascade" }),
+  kind: alertKindEnum("kind").notNull(),
+  /** move_pct: ± basis points over windowDays. */
+  thresholdBps: integer("threshold_bps"),
+  windowDays: integer("window_days").notNull().default(7),
+  /** above / below: target market price per copy. */
+  targetCents: cents("target_cents"),
+  active: boolean("active").notNull().default(true),
+  note: text("note"),
+  createdAt: createdAt(),
+  createdBy: createdBy(),
+});
+
+/** A fired alert. Shown on the dashboard until someone dismisses it. */
+export const alertEvents = pgTable(
+  "alert_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    /** null = the default ±X% rule from settings. */
+    alertId: uuid("alert_id").references(() => priceAlerts.id, { onDelete: "set null" }),
+    kind: alertKindEnum("kind").notNull(),
+    onDate: date("on_date").notNull(),
+    fromCents: cents("from_cents"),
+    toCents: cents("to_cents").notNull(),
+    changeBps: integer("change_bps"),
+    message: text("message").notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    acknowledgedBy: uuid("acknowledged_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("alert_events_open_idx").on(t.acknowledgedAt)],
+);
+
+/** Daily totals for the "inventory value over time" chart. */
+export const inventoryValueSnapshots = pgTable("inventory_value_snapshots", {
+  onDate: date("on_date").primaryKey(),
+  costCents: cents("cost_cents").notNull(),
+  marketCents: cents("market_cents").notNull(),
+  pricedCostCents: cents("priced_cost_cents").notNull(),
+  units: integer("units").notNull(),
+  unpricedRows: integer("unpriced_rows").notNull(),
+  createdAt: createdAt(),
 });
 
 // ---------------------------------------------------------------- audit

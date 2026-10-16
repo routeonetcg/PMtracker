@@ -333,6 +333,8 @@ export const settingsSchema = z.object({
   slowMoverDays: z.coerce.number().int().min(1).max(3650),
   ebayFeePct: percentBps("eBay fee", { min: 0, max: 5000 }).refine((v) => v !== null, "Required"),
   ebayFeeFixed: dollarsOrZero("eBay fixed fee"),
+  defaultAlertPct: percentBps("Default alert", { min: 0, max: 100000 }).refine((v) => v !== null, "Required (0 turns it off)"),
+  alertWindowDays: z.coerce.number().int().min(1).max(365),
 });
 
 /** Flatten zod issues into { "lines.0.card.name": "message" }. */

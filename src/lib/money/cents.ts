@@ -125,3 +125,39 @@ export function bpsToInput(bps: Bps | null | undefined): string {
   const frac = abs % 100;
   return `${sign}${Math.floor(abs / 100)}${frac ? `.${String(frac).padStart(2, "0").replace(/0$/, "")}` : ""}`;
 }
+
+/**
+ * Convert a provider's decimal amount (number or string, e.g. 12.345 or "1.2e1")
+ * to cents, rounding half away from zero, without floating-point multiplication.
+ * Returns null for anything that isn't a finite non-negative-or-negative decimal.
+ */
+export function decimalToCents(value: number | string | null | undefined): Cents | null {
+  if (value === null || value === undefined || value === "") return null;
+  let s = typeof value === "number" ? (Number.isFinite(value) ? String(value) : "") : value.trim();
+  if (/e/i.test(s)) {
+    const n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    s = n.toFixed(6);
+  }
+  const m = /^(-)?(\d*)(?:\.(\d*))?$/.exec(s);
+  if (!m || (m[2] === "" && (m[3] ?? "") === "")) return null;
+  const [, neg, whole = "", frac = ""] = m;
+  const padded = (frac + "000").slice(0, 3);
+  let cents = Number(whole || "0") * 100 + Number(padded.slice(0, 2));
+  if (Number(padded[2]) >= 5) cents += 1;
+  if (!Number.isSafeInteger(cents)) return null;
+  return neg ? -cents : cents;
+}
+
+/** Parse a decimal rate like "1.0823" into parts per million (1082300). */
+export function decimalToPpm(value: string | number): number | null {
+  const s = String(value).trim();
+  const m = /^(\d+)(?:\.(\d{0,6})\d*)?$/.exec(s);
+  if (!m) return null;
+  return Number(m[1]) * 1_000_000 + Number((m[2] ?? "").padEnd(6, "0"));
+}
+
+/** Convert EUR cents to USD cents with a rate in parts per million. */
+export function eurToUsdCents(eurCents: Cents, eurUsdPpm: number): Cents {
+  return mulDivRound(eurCents, eurUsdPpm, 1_000_000);
+}

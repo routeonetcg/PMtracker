@@ -1,5 +1,13 @@
 import { ImageOff } from "lucide-react";
+import { ImgWithFallback } from "@/components/img-fallback";
 import { formatBps, formatUSD } from "@/lib/money";
+
+const eur = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" });
+/** Provider amounts can be EUR (Cardmarket). Display only. */
+export function formatNative(cents: number | null, currency: string) {
+  if (cents === null) return "—";
+  return currency === "EUR" ? eur.format(cents / 100) : formatUSD(cents);
+}
 import { STATUS_BADGE, STATUSES, type ItemStatus } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/misc";
@@ -54,7 +62,7 @@ export function CardThumb({
   return (
     <div className={cn("relative aspect-[63/88] shrink-0 overflow-hidden rounded-[6%/4.3%] bg-muted ring-1 ring-border", dims, className)}>
       {src ? (
-        <img src={src} alt={name} loading="lazy" decoding="async" className="size-full object-cover" />
+        <ImgWithFallback src={src} alt={name} className="size-full object-cover" />
       ) : (
         <div className="flex size-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-navy to-[#14284f] p-[8%] text-center">
           {size === "sm" ? (

@@ -1,6 +1,7 @@
-import { AlertTriangle, Boxes, PackagePlus, ShoppingBag, TrendingUp, Trophy, Turtle } from "lucide-react";
+import { AlertTriangle, BellRing, Boxes, PackagePlus, ShoppingBag, TrendingUp, Trophy, Turtle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AlertsList } from "@/components/alerts-list";
 import { ChannelChart, InventoryValueChart, MonthlyChart } from "@/components/charts";
 import { CardThumb, Money, Pct } from "@/components/display";
 import { PeriodFilter } from "@/components/period-filter";
@@ -22,7 +23,7 @@ function first(v: string | string[] | undefined) {
 export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   const sp = await searchParams;
   const period = resolvePeriod(first(sp.period), first(sp.from), first(sp.to));
-  const { metrics: m, costMissingInStock, slowMovers, settings } = await db((tx) => loadDashboard(tx, period));
+  const { metrics: m, costMissingInStock, slowMovers, settings, alerts, staleCount } = await db((tx) => loadDashboard(tx, period));
   const hasActivity = m.unitsSold > 0 || m.expensesCents > 0;
 
   return (
@@ -66,6 +67,22 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
         </Link>
       ) : null}
 
+      {alerts.length ? (
+        <Card className="border-primary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BellRing className="size-4 text-gold" /> Price alerts
+            </CardTitle>
+            <Link href="/prices" className="text-xs text-gold">
+              All prices →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <AlertsList alerts={alerts} compact />
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* KPI tiles */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Key numbers">
         <Kpi label="Revenue" value={<Money cents={m.revenueCents} whole />} sub={m.tradeValueCents ? `incl. ${formatUSD(m.tradeValueCents, { whole: true })} in trades` : `${m.unitsSold} card${m.unitsSold === 1 ? "" : "s"} sold`} />
@@ -76,9 +93,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
         <Kpi
           label="Inventory at market"
           value={<Money cents={m.inventoryMarketCents} whole />}
-          sub={m.unpricedRows ? `${m.unpricedRows} without a market price` : "all cards priced"}
+          sub={[m.unpricedRows ? `${m.unpricedRows} unpriced` : "all priced", staleCount ? `${staleCount} stale` : null].filter(Boolean).join(" · ")}
         />
-        <Kpi label="Unrealized P/L" value={<Money cents={m.unrealizedCents} pl whole />} sub="market − cost, priced cards" />
+        <Kpi
+          label="Unrealized P/L"
+          value={<Money cents={m.unrealizedCents} pl whole />}
+          sub={m.unrealizedExcludedRows ? `${m.unrealizedExcludedRows} skipped (no cost yet)` : "market − cost, priced cards"}
+        />
         <Kpi
           label="Sell-through"
           value={<Pct bps={m.sellThroughBps} />}
@@ -117,7 +138,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
         <Card>
           <CardHeader>
             <CardTitle>Inventory value over time</CardTitle>
-            <span className="text-xs text-muted-foreground">month end, at cost</span>
+            <span className="text-xs text-muted-foreground">month end</span>
           </CardHeader>
           <CardContent>
             <InventoryValueChart data={m.inventoryOverTime} />

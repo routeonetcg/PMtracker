@@ -10,7 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/misc";
 import { settingsSchema } from "@/lib/validation";
 import { saveSettings } from "./actions";
 
-type S = { defaultMarkupPct: string; roundAskingTo: string; staleDays: string; slowMoverDays: string; ebayFeePct: string; ebayFeeFixed: string };
+type S = {
+  defaultMarkupPct: string;
+  roundAskingTo: string;
+  staleDays: string;
+  slowMoverDays: string;
+  ebayFeePct: string;
+  ebayFeeFixed: string;
+  defaultAlertPct: string;
+  alertWindowDays: string;
+};
 
 export function SettingsForm({ initial }: { initial: S }) {
   const router = useRouter();
@@ -54,6 +63,12 @@ export function SettingsForm({ initial }: { initial: S }) {
           </Field>
           <Field label="eBay fixed fee per order" htmlFor="s-ebayfix" error={err("ebayFeeFixed")}>
             <MoneyInput id="s-ebayfix" value={f.ebayFeeFixed} onChange={(e) => setF({ ...f, ebayFeeFixed: e.target.value })} />
+          </Field>
+          <Field label="Alert when any card moves ± (%)" htmlFor="s-alert" hint="0 turns the default alert off" error={err("defaultAlertPct")}>
+            <Input id="s-alert" inputMode="decimal" value={f.defaultAlertPct} onChange={(e) => setF({ ...f, defaultAlertPct: e.target.value })} />
+          </Field>
+          <Field label="…within (days)" htmlFor="s-alertdays" error={err("alertWindowDays")}>
+            <Input id="s-alertdays" inputMode="numeric" value={f.alertWindowDays} onChange={(e) => setF({ ...f, alertWindowDays: e.target.value })} />
           </Field>
           <Button type="submit" disabled={pending} className="sm:col-span-2">
             Save settings

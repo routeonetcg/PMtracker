@@ -8,6 +8,9 @@ import {
   CartesianGrid,
   Cell,
   LabelList,
+  Line,
+  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -172,6 +175,55 @@ export function ChannelChart({ data }: { data: { label: string; profitCents: num
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function PriceHistoryChart({
+  data,
+  costPerCopyCents,
+  askingCents,
+}: {
+  data: { onDate: string; priceCents: number }[];
+  costPerCopyCents: number | null;
+  askingCents: number | null;
+}) {
+  const fmtDay = (d: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
+  const values = [...data.map((d) => d.priceCents), costPerCopyCents ?? 0, askingCents ?? 0];
+  const max = Math.max(...values, 100);
+  const min = Math.min(...data.map((d) => d.priceCents), costPerCopyCents ?? Infinity, askingCents ?? Infinity);
+  return (
+    <div>
+      <Legend
+        items={[
+          { label: "Market", color: "var(--chart-1)" },
+          ...(costPerCopyCents !== null ? [{ label: "Cost (each)", color: "var(--muted-foreground)" }] : []),
+          ...(askingCents !== null ? [{ label: "Asking", color: "var(--chart-2)" }] : []),
+        ]}
+      />
+      <div className="h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke="var(--border)" />
+            <XAxis dataKey="onDate" tickFormatter={fmtDay} {...axis} interval="preserveStartEnd" minTickGap={24} />
+            <YAxis tickFormatter={compactUSD} {...axis} width={52} domain={[Math.max(0, Math.floor(min * 0.9)), Math.ceil(max * 1.05)]} />
+            <Tooltip cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }} content={<ChartTooltip labelFormatter={fmtDay} />} />
+            {costPerCopyCents !== null ? (
+              <ReferenceLine y={costPerCopyCents} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+            ) : null}
+            {askingCents !== null ? <ReferenceLine y={askingCents} stroke="var(--chart-2)" strokeDasharray="4 4" /> : null}
+            <Line
+              type="linear"
+              dataKey="priceCents"
+              name="Market"
+              stroke="var(--chart-1)"
+              strokeWidth={2}
+              dot={data.length < 3 ? { r: 4, fill: "var(--chart-1)", strokeWidth: 0 } : false}
+              activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--card)" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,8 @@ export default async function SettingsPage() {
           slowMoverDays: String(settings.slowMoverDays),
           ebayFeePct: bpsToInput(settings.ebayFeeBps),
           ebayFeeFixed: centsToInput(settings.ebayFeeFixedCents),
+          defaultAlertPct: bpsToInput(settings.defaultAlertBps),
+          alertWindowDays: String(settings.alertWindowDays),
         }}
       />
       <Card>

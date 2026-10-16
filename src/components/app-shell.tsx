@@ -12,6 +12,7 @@ import {
   Receipt,
   Settings,
   ShoppingBag,
+  TrendingUp,
   Sun,
   Wallet,
 } from "lucide-react";
@@ -30,6 +31,7 @@ export const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/buy", label: "Buy cards", icon: PackagePlus },
+  { href: "/prices", label: "Prices", icon: TrendingUp },
   { href: "/sales", label: "Sales", icon: ShoppingBag },
   { href: "/trades", label: "Trades", icon: ArrowLeftRight },
   { href: "/expenses", label: "Expenses", icon: Receipt },
@@ -57,9 +59,11 @@ function ThemeToggle({ className }: { className?: string }) {
 
 export function AppShell({
   partner,
+  alertCount = 0,
   children,
 }: {
   partner: { displayName: string; color: string };
+  alertCount?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -86,6 +90,7 @@ export function AppShell({
             >
               <item.icon className="size-4" />
               {item.label}
+              {item.href === "/prices" && alertCount > 0 ? <CountBadge n={alertCount} className="ml-auto" /> : null}
             </Link>
           ))}
         </nav>
@@ -135,10 +140,11 @@ export function AppShell({
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
+            className="relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
           >
             <Menu className="size-5" />
             More
+            {alertCount > 0 ? <CountBadge n={alertCount} className="absolute top-2 right-[calc(50%-1.25rem)]" /> : null}
           </button>
         </div>
       </nav>
@@ -154,7 +160,10 @@ export function AppShell({
                 className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center text-sm font-medium hover:bg-accent"
               >
                 <item.icon className="size-6 text-gold" />
-                {item.label}
+                <span className="flex items-center gap-1">
+                  {item.label}
+                  {item.href === "/prices" && alertCount > 0 ? <CountBadge n={alertCount} /> : null}
+                </span>
               </Link>
             ))}
           </div>
@@ -169,6 +178,14 @@ export function AppShell({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CountBadge({ n, className }: { n: number; className?: string }) {
+  return (
+    <span className={cn("grid h-4 min-w-4 place-items-center rounded-full bg-loss px-1 text-[10px] font-bold text-white num", className)} aria-label={`${n} alerts`}>
+      {n > 99 ? "99+" : n}
+    </span>
   );
 }
 

@@ -4,7 +4,7 @@ Private back office for Route One TCG: inventory, cost basis, sales, trades, exp
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn-style components (Radix) · Supabase (Postgres, Auth, Storage) · Drizzle ORM · Recharts · Vitest · Playwright · Vercel.
 
-> **Build status:** Phase 1 (inventory, sales, trades, expenses, dashboard) is complete. Phase 2 (market price feeds, price history, alerts), Phase 3 (Show Mode and events) and Phase 4 (grading, partners, reports) come next.
+> **Build status:** Phase 1 (inventory, sales, trades, expenses, dashboard) and Phase 2 (market price feeds, price history, alerts) are complete. Phase 3 (Show Mode and events) and Phase 4 (grading, partners, reports) come next.
 
 ---
 
@@ -30,6 +30,22 @@ Private back office for Route One TCG: inventory, cost basis, sales, trades, exp
 - **Security:** Postgres row-level security lets only the two partner accounts read or write anything. Public sign-up is off.
 - **Activity log:** a database trigger records who changed what, and when, on every table.
 - **Money:** always integer **cents**, and percentages are integer **basis points**. Splits use the largest-remainder method, so the parts always add up exactly.
+
+## What's in Phase 2
+
+- **Link a card to a price source** from its page, using **Link price source**. Search the provider, pick the matching card, then pick which price to follow. The app suggests one based on the card's condition and variant, for example TCGplayer Holofoil market for a raw holo, or PriceCharting PSA 10 for a PSA 10 slab.
+- **Daily update:** every morning the price job fetches each linked product once and saves a dated snapshot. Cards that follow the feed get the new price.
+- **Manual override:** a price you enter by hand, with its source and date shown, always wins until you tap **Use feed price**.
+- **Price history chart** on every card, with dashed lines for cost and asking price.
+- **Alerts:**
+  - A shop-wide rule flags any card that moves ±X% in N days. You set X and N in Settings; the default is ±15% in 7 days.
+  - Per-card rules: goes above $X, goes below $X, or moves ±X% in N days.
+  - Open alerts show on the dashboard and the Prices page, and a badge on the menu shows how many. Each one can be dismissed.
+- **Stale prices:** any price older than 7 days (configurable) is flagged on the card, in the inventory filters and on the Prices page.
+- **Prices page:** cards not linked yet, stale prices, feeds whose last update failed, provider status, the EUR→USD rate, and an **Update prices now** button.
+- **Card lookup** when adding cards: search the free TCGdex catalog to fill in set, number, rarity and picture.
+- **Market value over time:** the dashboard now shows inventory at market next to inventory at cost.
+- **Unrealized P/L** leaves out cards whose cost hasn't been entered, so they don't show up as pure profit.
 
 ---
 
@@ -65,10 +81,11 @@ On a local database, the seed creates both logins with `PARTNER_PASSWORD`. Sign 
 ### Tests
 
 ```bash
-pnpm test        # unit tests: all money math (lots, sales, bundles, trades, fees, grading, partner balances), metrics, CSV
+pnpm test        # unit tests: money math (lots, sales, bundles, trades, fees, grading, partner balances), metrics, CSV, price parsers, alerts
 pnpm typecheck
 pnpm lint
 pnpm e2e         # Playwright, iPhone viewport. RESETS THE LOCAL DATABASE first, and refuses to run against anything but local.
+                 # The Phase 2 test needs PRICE_FIXTURES=1 in .env.local (it uses the sample price responses).
 ```
 
 On machines where Playwright can't download its own browser, set `CHROMIUM_PATH=/path/to/chrome`.
@@ -86,17 +103,63 @@ On machines where Playwright can't download its own browser, set `CHROMIUM_PATH=
 | `APP_TIMEZONE` | Optional, default `America/New_York` | What "today" means for dates and periods |
 | `PARTNER_1_NAME`, `PARTNER_1_EMAIL`, `PARTNER_2_NAME`, `PARTNER_2_EMAIL` | Your two partners | `pnpm db:seed` creates the partner records |
 | `PARTNER_PASSWORD` | Local only | The seed creates local logins with this password |
+| `CRON_SECRET` | Any long random string (`openssl rand -hex 32`) | Protects `/api/cron/prices`. Vercel Cron sends it automatically. |
+| `PRICECHARTING_TOKEN` | Optional, paid. See below. | Turns on PriceCharting (graded, Japanese, sealed) |
+| `PRICE_FIXTURES` | **Local development only**, set to `1` | Uses built-in **sample** price responses (made-up prices) when you can't reach the price APIs. Never set this in production. |
 
-### Price API keys (Phase 2)
+### Price sources and API keys
 
-Prices start with free sources and manual entry. Paid providers switch on when their key is present:
+| Provider | Covers | Cost | Key |
+|---|---|---|---|
+| **TCGdex** (tcgdex.dev) | English catalog and pictures. TCGplayer prices (USD) by variant, and Cardmarket prices (EUR, converted daily with the European Central Bank rate). Japanese catalog, though TCGplayer prices are usually missing for Japanese cards. | Free, open source | none |
+| **PriceCharting** | Ungraded and graded prices (PSA, BGS, CGC, SGC 10, and grades 7–9.5), Japanese cards, sealed product | **Paid:** needs the *Legendary* subscription | `PRICECHARTING_TOKEN` |
+| Manual | Anything, such as eBay sold comps or show prices | Free | none |
 
-| Provider | Variable | Cost |
-|---|---|---|
-| TCGdex | none | Free, open source |
-| PriceCharting (graded, Japanese, sealed) | `PRICECHARTING_TOKEN` | Needs the paid **Legendary** plan. Copy the 40-character token from *Subscription → API/Download*. |
+**To turn on PriceCharting:** subscribe to Legendary, go to *Subscription → API/Download*, and copy the 40-character token. Add it as `PRICECHARTING_TOKEN` in `.env.local` locally, or in Vercel → Settings → Environment Variables, then redeploy.
 
-Add keys to `.env.local` locally, and under **Vercel → Project → Settings → Environment Variables** in production. Then redeploy. The app never scrapes sites that forbid it.
+PriceCharting documents `manual-only-price` as the PSA 10 price and `bgs-10-price` as BGS 10. The other grade slots the app uses are the commonly used mapping, but haven't been checked against a live response yet:
+- `loose-price` = ungraded
+- `cib-price` = grade 7
+- `new-price` = grade 8
+- `graded-price` = grade 9
+- `box-only-price` = grade 9.5
+- `condition-17-price` = CGC 10
+- `condition-18-price` = SGC 10
+
+After adding the token, link one graded card and compare the prices with the card's page on pricecharting.com.
+
+Not used:
+- **pokemontcg.io** is deprecated: no new sign-ups, and existing keys stop working on Mar 1, 2027.
+- The **TCGplayer API** is closed to new developers.
+- **eBay sold-data APIs** are approval-only.
+- **PokemonPriceTracker** and **JustTCG** free tiers are non-commercial.
+- The app never scrapes websites.
+
+### The daily price job
+
+`GET /api/cron/prices` with `Authorization: Bearer $CRON_SECRET` runs the update. It is safe to run more than once a day. Pick one way to schedule it:
+
+- **Vercel Cron.** `vercel.json` already schedules it daily at 10:15 UTC, which is about 6am Eastern. Set `CRON_SECRET` in Vercel and it just works. Vercel's Hobby plan is for non-commercial use, so a business should be on Pro.
+- **Supabase pg_cron (free).** In the SQL editor, enable the `pg_cron` and `pg_net` extensions, then run:
+  ```sql
+  select cron.schedule('route-one-prices', '15 10 * * *', $$
+    select net.http_get(
+      url := 'https://YOUR-APP.vercel.app/api/cron/prices',
+      headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
+      timeout_milliseconds := 290000
+    );
+  $$);
+  ```
+
+You can also run it by hand with **Prices → Update prices now**, or locally with `pnpm prices:run`.
+
+### Trying prices offline
+
+If your machine can't reach the price APIs, add `PRICE_FIXTURES=1` to `.env.local`. The app then uses built-in sample responses with made-up prices, and the Prices page shows an "Offline sample prices" banner. To fill the history chart and trigger some alerts locally, run:
+
+```bash
+PRICE_FIXTURES=1 pnpm prices:backfill 30   # replays 30 days of sample prices (local database only)
+```
 
 ---
 
@@ -116,10 +179,10 @@ Add keys to `.env.local` locally, and under **Vercel → Project → Settings �
    pnpm db:seed
    ```
    The seed links each partner record to the login with the same email. Restore your local `.env.local` afterwards.
-6. **Deploy to Vercel:** import the GitHub repo at vercel.com/new. Next.js is detected automatically. Add the environment variables from the table above and deploy.
+6. **Deploy to Vercel:** import the GitHub repo at vercel.com/new. Next.js is detected automatically. Add the environment variables from the table above, including `CRON_SECRET`, and deploy. The daily price job is picked up from `vercel.json`.
 7. **Set the auth site URL** in Supabase → Authentication → URL Configuration to your Vercel URL.
 
-> **Vercel plan:** Vercel's Hobby plan is for personal, non-commercial use. A business should use **Pro**. The Phase 2 daily price job can run on Vercel Cron, or for free on Supabase `pg_cron`. Both are documented when Phase 2 lands.
+> **Vercel plan:** Vercel's Hobby plan is for personal, non-commercial use. A business should use **Pro**. If you'd rather not pay for Vercel Cron, the daily price job can also run on Supabase `pg_cron` (see *The daily price job* above).
 
 ### Changing the database
 

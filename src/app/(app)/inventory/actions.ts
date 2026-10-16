@@ -3,7 +3,8 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { cards, inventoryItems, itemPhotos } from "@/db/schema";
+import { cards, inventoryItems, itemPhotos, itemPriceHistory } from "@/db/schema";
+import { todayISO } from "@/lib/dates";
 import { db } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { bulkEditSchema, itemEditSchema } from "@/lib/validation";
@@ -74,34 +75,21 @@ export async function updateItem(input: unknown) {
           marketCents: d.market.market,
           marketSource: marketChanged ? (d.market.marketSource ?? "Manual") : (d.market.marketSource ?? row.marketSource),
           marketUpdatedAt: marketChanged ? (d.market.market === null ? null : new Date()) : row.marketUpdatedAt,
+          // A hand-edited market price overrides the linked feed until "Use feed price".
+          ...(marketChanged ? { marketMode: "manual" as const } : {}),
         })
         .where(eq(inventoryItems.id, d.id));
+      if (marketChanged && d.market.market !== null) {
+        const source = `${d.market.marketSource ?? "Manual"} (manual)`;
+        await tx
+          .insert(itemPriceHistory)
+          .values({ itemId: d.id, onDate: todayISO(), priceCents: d.market.market, source })
+          .onConflictDoUpdate({ target: [itemPriceHistory.itemId, itemPriceHistory.onDate], set: { priceCents: d.market.market, source } });
+      }
     });
     revalidatePath("/inventory");
     revalidatePath(`/inventory/${d.id}`);
     return d.id;
-  });
-}
-
-/** Quick "price check": set today's market price from the detail page. */
-export async function setMarketPrice(input: unknown) {
-  const schema = z.object({
-    id: z.string().uuid(),
-    market: z.string(),
-    source: z.string().trim().max(120).optional(),
-  });
-  return runAction(schema, input, async (d) => {
-    const { parseDollars } = await import("@/lib/money");
-    const cents = d.market.trim() === "" ? null : parseDollars(d.market);
-    if (d.market.trim() !== "" && (cents === null || cents < 0)) throw new UserError("Enter a price like 42.50");
-    await db((tx) =>
-      tx
-        .update(inventoryItems)
-        .set({ marketCents: cents, marketSource: cents === null ? null : d.source || "Manual", marketUpdatedAt: cents === null ? null : new Date() })
-        .where(eq(inventoryItems.id, d.id)),
-    );
-    revalidatePath(`/inventory/${d.id}`);
-    return cents;
   });
 }
 

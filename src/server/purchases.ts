@@ -1,7 +1,8 @@
 import "server-only";
 import type { z } from "zod";
 import type { Tx } from "@/db";
-import { acquisitions, inventoryItems } from "@/db/schema";
+import { acquisitions, inventoryItems, itemPriceHistory } from "@/db/schema";
+import { todayISO } from "@/lib/dates";
 import { splitLot, type LotLine } from "@/lib/money";
 import type { purchaseSchema } from "@/lib/validation";
 import { findOrCreateCard, UserError } from "./inventory";
@@ -87,6 +88,9 @@ export async function createPurchase(tx: Tx, data: PurchaseData, opts: { kind?: 
       })
       .returning({ id: inventoryItems.id });
     itemIds.push(item.id);
+    if (line.unitMarket !== null) {
+      await tx.insert(itemPriceHistory).values({ itemId: item.id, onDate: todayISO(), priceCents: line.unitMarket, source: "Entered at purchase" });
+    }
   }
   return { acquisitionId: acq.id, itemIds };
 }

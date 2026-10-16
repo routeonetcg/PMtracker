@@ -16,7 +16,9 @@
     "db:generate": "drizzle-kit generate",
     "db:reset": "supabase db reset && pnpm db:seed",
     "db:push": "supabase db push",
-    "db:seed": "tsx --env-file=.env.local scripts/seed.ts"
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "prices:backfill": "tsx --conditions=react-server --env-file=.env.local scripts/prices-backfill.ts",
+    "prices:run": "tsx --conditions=react-server --env-file=.env.local scripts/prices-run.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
