@@ -4,7 +4,7 @@ Private back office for Route One TCG: inventory, cost basis, sales, trades, exp
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn-style components (Radix) · Supabase (Postgres, Auth, Storage) · Drizzle ORM · Recharts · Vitest · Playwright · Vercel.
 
-> **Build status:** Phase 1 (inventory, sales, trades, expenses, dashboard) and Phase 2 (market price feeds, price history, alerts) are complete. Phase 3 (Show Mode and events) and Phase 4 (grading, partners, reports) come next.
+> **Build status:** Phases 1–3 are complete: inventory, sales, trades, expenses and dashboard; market prices, history and alerts; Show Mode and events. Phase 4 (grading, partners, reports) comes next.
 
 ---
 
@@ -47,6 +47,23 @@ Private back office for Route One TCG: inventory, cost basis, sales, trades, exp
 - **Market value over time:** the dashboard now shows inventory at market next to inventory at cost.
 - **Unrealized P/L** leaves out cards whose cost hasn't been entered, so they don't show up as pure profit.
 
+## What's in Phase 3
+
+- **Shows & events:** name, date (or several days), location, table fee, starting cash and who holds the cash box. The table fee becomes an expense automatically and stays in sync if you edit it. The Gold Coast Card Show (Nov 14, 2026, Stamford Town Center Mall) is already seeded.
+- **Start show → Show Mode:** a full-screen screen built for the table.
+  - Type a few letters in the big search box, tap the card, then tap how they paid (Cash, Venmo, Zelle, PayPal, Card). The sale is recorded. The price starts at the asking price, with one-tap Ask, Market and −10% buttons for haggling.
+  - Each sale shows **Undo** for a few seconds.
+  - Card payments take the reader fee from Settings (default 2.6% + 15¢).
+  - Running totals at the top: sales, total, **cash in box** and digital.
+  - **Buy** and **Trade** buttons for buying a card at the table, or opening a trade.
+  - **No signal?** The sale is saved on the phone and syncs automatically when the connection returns, or when you tap the banner. Each sale carries a unique id, so a retry can never record it twice.
+- **Where the money goes:** cash goes to whoever holds the cash box, and digital payments go to the partner who made the sale.
+- **End-of-show report:**
+  - revenue, gross and net profit (after the table fee and other show expenses), and average sale
+  - payment breakdown, best sellers, and the buys, trades and expenses at the show
+  - the **cash box**: starting cash + cash taken − cash paid out = what should be in the box. **Close show** asks for the counted cash and shows over or short.
+- While a show is live, the gold center button on the phone and the top of the sidebar jump straight to Show Mode. The dashboard shows the next or live show.
+
 ---
 
 ## Run it locally
@@ -86,6 +103,7 @@ pnpm typecheck
 pnpm lint
 pnpm e2e         # Playwright, iPhone viewport. RESETS THE LOCAL DATABASE first, and refuses to run against anything but local.
                  # The Phase 2 test needs PRICE_FIXTURES=1 in .env.local (it uses the sample price responses).
+                 # The Phase 3 test walks through a whole show, including selling with the network switched off.
 ```
 
 On machines where Playwright can't download its own browser, set `CHROMIUM_PATH=/path/to/chrome`.

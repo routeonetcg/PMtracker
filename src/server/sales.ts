@@ -15,6 +15,11 @@ export type SaleData = z.output<typeof saleSchema>;
  * exact share of cost. Profit = price − fees − shipping − cost, per line.
  */
 export async function createSale(tx: Tx, data: SaleData) {
+  // A retried Show Mode sale (same clientRef) returns the original instead of selling twice.
+  if (data.clientRef) {
+    const [existing] = await tx.select({ id: sales.id, saleNo: sales.saleNo }).from(sales).where(eq(sales.clientRef, data.clientRef));
+    if (existing) return { id: existing.id, saleNo: existing.saleNo, profitCents: 0, duplicate: true as const };
+  }
   const s = await getSettings(tx);
   const ids = data.lines.map((l) => l.itemId);
   const rows = await tx.select().from(inventoryItems).where(inArray(inventoryItems.id, ids));
@@ -63,6 +68,7 @@ export async function createSale(tx: Tx, data: SaleData) {
       receivedByHolderId: data.receivedByHolderId,
       splitMethod: data.split,
       buyerNote: data.buyerNote,
+      clientRef: data.clientRef ?? null,
     })
     .returning({ id: sales.id, saleNo: sales.saleNo });
 
@@ -78,7 +84,7 @@ export async function createSale(tx: Tx, data: SaleData) {
       costMissing: taken[i].costMissing,
     })),
   );
-  return { id: sale.id, saleNo: sale.saleNo, profitCents: result.profitCents };
+  return { id: sale.id, saleNo: sale.saleNo, profitCents: result.profitCents, duplicate: false as const };
 }
 
 /** Undo a sale: the cards go back in stock and the sale is deleted (kept in the activity log). */
@@ -132,6 +138,7 @@ export async function listSales(tx: Tx, opts: { limit?: number; eventId?: string
           shippingCents: saleLines.shippingCents,
           costBasisCents: saleLines.costBasisCents,
           costMissing: saleLines.costMissing,
+          cardId: cards.id,
           cardName: cards.name,
           setName: cards.setName,
           number: cards.number,

@@ -21,6 +21,8 @@ export async function saveSettings(input: unknown) {
           ebayFeeFixedCents: d.ebayFeeFixed,
           defaultAlertBps: d.defaultAlertPct!,
           alertWindowDays: d.alertWindowDays,
+          cardFeeBps: d.cardFeePct!,
+          cardFeeFixedCents: d.cardFeeFixed,
         })
         .where(eq(settings.id, 1)),
     );

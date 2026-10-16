@@ -41,7 +41,7 @@ export async function failingFeeds(tx: Tx) {
       label: marketProducts.label,
       lastError: marketProducts.lastError,
       lastFetchedAt: marketProducts.lastFetchedAt,
-      cards: sql<number>`(select count(*)::int from ${inventoryItems} i where i.market_product_id = ${marketProducts.id})`,
+      cards: sql<number>`(select count(*)::int from ${inventoryItems} i where i.market_product_id = "market_products"."id")`,
     })
     .from(marketProducts)
     .where(and(sql`${marketProducts.lastError} is not null`, inArray(marketProducts.id, tx.select({ id: inventoryItems.marketProductId }).from(inventoryItems).where(inArray(inventoryItems.status, ACTIVE_STATUSES)))));

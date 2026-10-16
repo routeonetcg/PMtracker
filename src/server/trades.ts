@@ -140,6 +140,7 @@ export async function listTrades(tx: Tx) {
       notes: trades.notes,
       partner: partners.displayName,
       eventId: trades.eventId,
+      paymentMethod: trades.paymentMethod,
     })
     .from(trades)
     .leftJoin(partners, eq(partners.id, trades.partnerId))

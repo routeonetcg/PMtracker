@@ -56,6 +56,7 @@ export async function createPurchase(tx: Tx, data: PurchaseData, opts: { kind?: 
       shippingCents: data.shipping,
       splitMethod: data.lines.length > 1 ? data.splitMethod : null,
       paidByHolderId: data.paidByHolderId,
+      paymentMethod: data.paymentMethod ?? null,
       eventId: data.eventId,
       notes: data.notes,
     })

@@ -17,6 +17,7 @@ export async function saveExpense(input: unknown) {
       description: d.description,
       eventId: d.eventId,
       paidByHolderId: d.paidByHolderId,
+      paymentMethod: d.paymentMethod ?? null,
     };
     const id = await db(async (tx) => {
       if (d.id) {

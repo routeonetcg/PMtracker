@@ -208,6 +208,7 @@ export const purchaseSchema = z
     eventId: optionalUuid,
     paidByHolderId: optionalUuid,
     holderId: optionalUuid,
+    paymentMethod: z.enum(tuple(keys(PAYMENT_METHODS))).optional().nullable(),
     /** Blank price = cost unknown for now ("cost missing"). */
     price: optionalDollars("Total price"),
     fees: dollarsOrZero("Fees"),
@@ -247,6 +248,7 @@ export const saleSchema = z
     receivedByHolderId: optionalUuid,
     split: z.enum(["weight", "manual", "even"]).default("weight"),
     buyerNote: optionalText,
+    clientRef: z.string().min(8).max(64).optional(),
     lines: z
       .array(
         z.object({
@@ -312,6 +314,7 @@ export const expenseSchema = z.object({
   description: z.string().trim().min(1, "Add a short description").max(300),
   eventId: optionalUuid,
   paidByHolderId: optionalUuid,
+  paymentMethod: z.enum(tuple(keys(PAYMENT_METHODS))).optional().nullable().or(z.literal("").transform(() => null)),
 });
 export type ExpenseFormInput = z.input<typeof expenseSchema>;
 
@@ -326,6 +329,23 @@ export const bulkEditSchema = z.object({
 });
 export type BulkEditInput = z.input<typeof bulkEditSchema>;
 
+export const eventSchema = z
+  .object({
+    name: z.string().trim().min(1, "Give the show a name").max(120),
+    startsOn: isoDate,
+    endsOn: isoDate.optional().nullable().or(z.literal("").transform(() => null)),
+    location: optionalText,
+    tableFee: dollarsOrZero("Table fee"),
+    tableFeePaidByHolderId: optionalUuid,
+    float: dollarsOrZero("Starting cash"),
+    cashHolderId: optionalUuid,
+    notes: optionalText,
+  })
+  .superRefine((v, ctx) => {
+    if (v.endsOn && v.endsOn < v.startsOn) ctx.addIssue({ code: "custom", path: ["endsOn"], message: "Ends before it starts" });
+  });
+export type EventFormInput = z.input<typeof eventSchema>;
+
 export const settingsSchema = z.object({
   defaultMarkupPct: percentBps("Default markup", { min: -9000, max: 100000 }).refine((v) => v !== null, "Required"),
   roundAskingTo: dollarsOrZero("Round asking to"),
@@ -335,6 +355,8 @@ export const settingsSchema = z.object({
   ebayFeeFixed: dollarsOrZero("eBay fixed fee"),
   defaultAlertPct: percentBps("Default alert", { min: 0, max: 100000 }).refine((v) => v !== null, "Required (0 turns it off)"),
   alertWindowDays: z.coerce.number().int().min(1).max(365),
+  cardFeePct: percentBps("Card fee", { min: 0, max: 2000 }).refine((v) => v !== null, "Required (0 = none)"),
+  cardFeeFixed: dollarsOrZero("Card fixed fee"),
 });
 
 /** Flatten zod issues into { "lines.0.card.name": "message" }. */

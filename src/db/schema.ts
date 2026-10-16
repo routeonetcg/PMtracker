@@ -107,6 +107,9 @@ export const settings = pgTable("settings", {
   defaultAlertBps: integer("default_alert_bps").notNull().default(1500),
   ebayFeeBps: integer("ebay_fee_bps").notNull().default(1325),
   ebayFeeFixedCents: cents("ebay_fee_fixed_cents").notNull().default(40),
+  /** Card reader fee applied to "Card" payments in Show Mode (e.g. 2.6% + 15¢). */
+  cardFeeBps: integer("card_fee_bps").notNull().default(260),
+  cardFeeFixedCents: cents("card_fee_fixed_cents").notNull().default(15),
   /** Default alert: flag any card whose market moves ± this much over `alertWindowDays`. 0 = off. */
   alertWindowDays: integer("alert_window_days").notNull().default(7),
   /** EUR→USD rate in parts per million (1.08 = 1080000), refreshed by the price job. */
@@ -122,10 +125,18 @@ export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on"),
   location: text("location"),
   tableFeeCents: cents("table_fee_cents").notNull().default(0),
+  /** The expense row created for the table fee (kept in sync with tableFeeCents). */
+  tableFeeExpenseId: uuid("table_fee_expense_id"),
+  tableFeePaidByHolderId: uuid("table_fee_paid_by_holder_id").references(() => holders.id),
   floatCents: cents("float_cents").notNull().default(0),
+  /** Who holds the cash box at the show. Cash sales go to this holder. */
+  cashHolderId: uuid("cash_holder_id").references(() => holders.id),
   status: eventStatusEnum("status").notNull().default("planned"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   countedCashCents: cents("counted_cash_cents"),
   notes: text("notes"),
   createdAt: createdAt(),
@@ -207,6 +218,8 @@ export const acquisitions = pgTable("acquisitions", {
   shippingCents: cents("shipping_cents").notNull().default(0),
   splitMethod: lotSplitEnum("split_method"),
   paidByHolderId: uuid("paid_by_holder_id").references(() => holders.id),
+  /** How it was paid (cash matters for the show cash box). */
+  paymentMethod: paymentMethodEnum("payment_method"),
   partnerId: uuid("partner_id").references(() => partners.id),
   eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
   tradeId: uuid("trade_id"),
@@ -292,6 +305,8 @@ export const sales = pgTable("sales", {
   splitMethod: saleSplitEnum("split_method").notNull().default("weight"),
   buyerNote: text("buyer_note"),
   notes: text("notes"),
+  /** Idempotency key from Show Mode so a retried sale (bad show Wi-Fi) is never recorded twice. */
+  clientRef: text("client_ref").unique(),
   createdAt: createdAt(),
   createdBy: createdBy(),
 });
@@ -355,6 +370,7 @@ export const expenses = pgTable("expenses", {
   description: text("description").notNull(),
   eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
   paidByHolderId: uuid("paid_by_holder_id").references(() => holders.id),
+  paymentMethod: paymentMethodEnum("payment_method"),
   createdAt: createdAt(),
   createdBy: createdBy(),
 });

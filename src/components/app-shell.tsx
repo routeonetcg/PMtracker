@@ -3,7 +3,9 @@
 import {
   ArrowLeftRight,
   Boxes,
+  CalendarDays,
   HandCoins,
+  Zap,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -34,6 +36,7 @@ export const NAV: NavItem[] = [
   { href: "/prices", label: "Prices", icon: TrendingUp },
   { href: "/sales", label: "Sales", icon: ShoppingBag },
   { href: "/trades", label: "Trades", icon: ArrowLeftRight },
+  { href: "/events", label: "Shows", icon: CalendarDays },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -60,10 +63,12 @@ function ThemeToggle({ className }: { className?: string }) {
 export function AppShell({
   partner,
   alertCount = 0,
+  liveEvent = null,
   children,
 }: {
   partner: { displayName: string; color: string };
   alertCount?: number;
+  liveEvent?: { id: string; name: string } | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -76,6 +81,12 @@ export function AppShell({
         <Link href="/" className="mb-6 px-2">
           <Logo />
         </Link>
+        {liveEvent ? (
+          <Link href={`/show/${liveEvent.id}`} className="mb-3 flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground">
+            <Zap className="size-4" /> Show Mode
+            <span className="ml-auto size-2 animate-pulse rounded-full bg-profit" />
+          </Link>
+        ) : null}
         <nav className="flex flex-1 flex-col gap-0.5">
           {NAV.map((item) => (
             <Link
@@ -131,11 +142,20 @@ export function AppShell({
         <div className="grid h-16 grid-cols-5 items-stretch">
           <TabLink href="/" label="Home" icon={LayoutDashboard} active={isActive(pathname, "/")} />
           <TabLink href="/inventory" label="Inventory" icon={Boxes} active={isActive(pathname, "/inventory")} />
-          <Link href="/sales/new" className="flex items-center justify-center" aria-label="Record a sale">
-            <span className="-mt-6 grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-4 ring-background">
-              <HandCoins className="size-6" />
-            </span>
-          </Link>
+          {liveEvent ? (
+            <Link href={`/show/${liveEvent.id}`} className="flex items-center justify-center" aria-label={`Show Mode: ${liveEvent.name}`}>
+              <span className="relative -mt-6 grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-4 ring-background">
+                <Zap className="size-6" />
+                <span className="absolute -top-1 -right-1 size-3 animate-pulse rounded-full bg-profit ring-2 ring-background" />
+              </span>
+            </Link>
+          ) : (
+            <Link href="/sales/new" className="flex items-center justify-center" aria-label="Record a sale">
+              <span className="-mt-6 grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-4 ring-background">
+                <HandCoins className="size-6" />
+              </span>
+            </Link>
+          )}
           <TabLink href="/sales" label="Sales" icon={Wallet} active={isActive(pathname, "/sales") && pathname !== "/sales/new"} />
           <button
             type="button"
@@ -152,7 +172,7 @@ export function AppShell({
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent title="More">
           <div className="grid grid-cols-3 gap-2">
-            {NAV.filter((n) => !["/", "/inventory", "/sales"].includes(n.href)).map((item) => (
+            {[...(liveEvent ? [{ href: `/show/${liveEvent.id}`, label: "Show Mode", icon: Zap }] : [{ href: "/sales/new", label: "Record sale", icon: HandCoins }]), ...NAV.filter((n) => !["/", "/inventory", "/sales"].includes(n.href))].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

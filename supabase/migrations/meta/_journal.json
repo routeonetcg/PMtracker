@@ -15,6 +15,13 @@
       "when": 1792153202713,
       "tag": "20261016122002_phase2_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792157739879,
+      "tag": "20261016133539_phase3_events",
+      "breakpoints": true
     }
   ]
 }

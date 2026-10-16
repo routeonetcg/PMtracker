@@ -8,7 +8,7 @@ import { useFormErrors } from "@/components/use-form-errors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, MoneyInput, Select } from "@/components/ui/form-controls";
-import { EXPENSE_CATEGORIES, type ExpenseCategory, keys } from "@/lib/labels";
+import { EXPENSE_CATEGORIES, type ExpenseCategory, keys, PAYMENT_METHODS, type PaymentMethod } from "@/lib/labels";
 import { centsToInput } from "@/lib/money";
 import { expenseSchema } from "@/lib/validation";
 import type { FormLookups } from "@/server/lookups";
@@ -22,6 +22,7 @@ type Existing = {
   description: string;
   eventId: string | null;
   paidByHolderId: string | null;
+  paymentMethod: PaymentMethod | null;
 };
 
 function ExpenseForm({ lookups, today, existing, onDone }: { lookups: FormLookups; today: string; existing?: Existing; onDone: () => void }) {
@@ -35,6 +36,7 @@ function ExpenseForm({ lookups, today, existing, onDone }: { lookups: FormLookup
     description: existing?.description ?? "",
     eventId: existing?.eventId ?? "",
     paidByHolderId: existing?.paidByHolderId ?? lookups.myHolderId ?? "",
+    paymentMethod: (existing?.paymentMethod ?? "") as PaymentMethod | "",
   });
 
   return (
@@ -97,6 +99,16 @@ function ExpenseForm({ lookups, today, existing, onDone }: { lookups: FormLookup
           </Select>
         </Field>
       </div>
+      <Field label="Paid with" htmlFor="x-pay" hint="Cash paid at a show comes out of the cash box">
+        <Select id="x-pay" value={f.paymentMethod} onChange={(e) => setF({ ...f, paymentMethod: e.target.value as PaymentMethod | "" })}>
+          <option value="">—</option>
+          {keys(PAYMENT_METHODS).map((m) => (
+            <option key={m} value={m}>
+              {PAYMENT_METHODS[m]}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Button type="submit" size="lg" disabled={pending}>
         {existing ? "Save" : "Add expense"}
       </Button>

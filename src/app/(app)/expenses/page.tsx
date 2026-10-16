@@ -72,6 +72,7 @@ export default async function ExpensesPage() {
                     description: e.description,
                     eventId: e.eventId,
                     paidByHolderId: e.paidByHolderId,
+                    paymentMethod: e.paymentMethod,
                   }}
                 />
               </li>

@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, Boxes, PackagePlus, ShoppingBag, TrendingUp, Trophy, Turtle } from "lucide-react";
+import { AlertTriangle, BellRing, Boxes, CalendarDays, Zap, PackagePlus, ShoppingBag, TrendingUp, Trophy, Turtle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertsList } from "@/components/alerts-list";
@@ -8,7 +8,7 @@ import { PeriodFilter } from "@/components/period-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui/misc";
 import { db } from "@/lib/auth";
-import { resolvePeriod } from "@/lib/dates";
+import { daysBetween, formatDate, resolvePeriod, todayISO } from "@/lib/dates";
 import { CHANNELS } from "@/lib/labels";
 import { formatUSD } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,8 @@ function first(v: string | string[] | undefined) {
 export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   const sp = await searchParams;
   const period = resolvePeriod(first(sp.period), first(sp.from), first(sp.to));
-  const { metrics: m, costMissingInStock, slowMovers, settings, alerts, staleCount } = await db((tx) => loadDashboard(tx, period));
+  const { metrics: m, costMissingInStock, slowMovers, settings, alerts, staleCount, live, next } = await db((tx) => loadDashboard(tx, period));
+  const today = todayISO();
   const hasActivity = m.unitsSold > 0 || m.expensesCents > 0;
 
   return (
@@ -64,6 +65,29 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
             ) : null}
             . <span className="font-semibold text-gold">Fill in costs →</span>
           </span>
+        </Link>
+      ) : null}
+
+      {live ? (
+        <Link href={`/show/${live.id}`} className="flex items-center gap-3 rounded-xl border border-primary/50 bg-gradient-to-r from-primary/20 to-card px-4 py-3">
+          <Zap className="size-5 text-gold" />
+          <span className="flex-1">
+            <span className="block text-xs font-semibold tracking-wide text-gold uppercase">Live now</span>
+            <span className="font-semibold">{live.name}</span>
+          </span>
+          <span className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground">Open Show Mode</span>
+        </Link>
+      ) : next ? (
+        <Link href={`/events/${next.id}`} className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover:bg-accent/40">
+          <CalendarDays className="size-5 text-gold" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted-foreground">
+              Next show · {formatDate(next.startsOn)} ·{" "}
+              {daysBetween(today, next.startsOn) === 0 ? "today" : `in ${daysBetween(today, next.startsOn)} days`}
+            </span>
+            <span className="block truncate font-semibold">{next.name}</span>
+          </span>
+          <span className="text-sm font-semibold text-gold">Details →</span>
         </Link>
       ) : null}
 

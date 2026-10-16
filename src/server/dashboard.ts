@@ -8,6 +8,7 @@ import { computeMetrics, type Realization } from "@/lib/metrics";
 import { costBasis } from "@/lib/money";
 import { getSettings } from "./inventory";
 import { monthlyValueSnapshots, openAlerts } from "./prices/queries";
+import { liveEvent, nextEvent } from "./events";
 
 export async function loadDashboard(tx: Tx, period: Period) {
   const s = await getSettings(tx);
@@ -146,6 +147,8 @@ export async function loadDashboard(tx: Tx, period: Period) {
   return {
     metrics: { ...metrics, inventoryOverTime },
     alerts: await openAlerts(tx, 6),
+    live: await liveEvent(tx),
+    next: await nextEvent(tx, today),
     staleCount,
     settings: s,
     costMissingInStock,

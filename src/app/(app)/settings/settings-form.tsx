@@ -19,6 +19,8 @@ type S = {
   ebayFeeFixed: string;
   defaultAlertPct: string;
   alertWindowDays: string;
+  cardFeePct: string;
+  cardFeeFixed: string;
 };
 
 export function SettingsForm({ initial }: { initial: S }) {
@@ -69,6 +71,12 @@ export function SettingsForm({ initial }: { initial: S }) {
           </Field>
           <Field label="…within (days)" htmlFor="s-alertdays" error={err("alertWindowDays")}>
             <Input id="s-alertdays" inputMode="numeric" value={f.alertWindowDays} onChange={(e) => setF({ ...f, alertWindowDays: e.target.value })} />
+          </Field>
+          <Field label="Card reader fee (%)" htmlFor="s-cardfee" hint="Taken off Card payments in Show Mode" error={err("cardFeePct")}>
+            <Input id="s-cardfee" inputMode="decimal" value={f.cardFeePct} onChange={(e) => setF({ ...f, cardFeePct: e.target.value })} />
+          </Field>
+          <Field label="Card reader fixed fee" htmlFor="s-cardfix" error={err("cardFeeFixed")}>
+            <MoneyInput id="s-cardfix" value={f.cardFeeFixed} onChange={(e) => setF({ ...f, cardFeeFixed: e.target.value })} />
           </Field>
           <Button type="submit" disabled={pending} className="sm:col-span-2">
             Save settings
